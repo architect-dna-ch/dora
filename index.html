@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DORA — Dynamic Overview & Retention Assistant</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            dora: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Minimal custom styles for animations & overlay behavior */
+    html { scroll-behavior: smooth; }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .pulse-dot { animation: pulseDot 1.6s infinite; }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.35; }
+    }
+    body.modal-open { overflow: hidden; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 antialiased">
+
+  <!-- ============================================================
+       HEADER
+  ============================================================ -->
+  <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-dora-500 to-dora-700 flex items-center justify-center text-white font-black text-lg shadow">
+          D
+        </div>
+        <div>
+          <h1 class="text-lg font-bold leading-tight text-slate-900">DORA</h1>
+          <p class="text-xs text-slate-500 leading-tight">Dynamic Overview & Retention Assistant</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 text-sm">
+        <span id="liveBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">
+          <span class="pulse-dot w-2 h-2 rounded-full bg-emerald-500"></span>
+          Live
+        </span>
+        <span class="hidden sm:inline text-slate-500">Teacher View</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- ============================================================
+         1) TEACHER PANEL — LAUNCH CHECKPOINT
+    ============================================================ -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-slate-900">Launch Checkpoint</h2>
+        <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Teacher Panel</span>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <!-- Left: form -->
+        <div class="space-y-4">
+          <div>
+            <label for="checkpointTitle" class="block text-sm font-medium text-slate-700 mb-1">Checkpoint Title</label>
+            <input id="checkpointTitle" type="text" value="Quick Retention Check"
+                   class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500 focus:border-transparent" />
+          </div>
+
+          <div>
+            <label for="checkpointQuestion" class="block text-sm font-medium text-slate-700 mb-1">Question</label>
+            <textarea id="checkpointQuestion" rows="2"
+                      class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500 focus:border-transparent">What did we cover in today's lesson?</textarea>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="checkpointDuration" class="block text-sm font-medium text-slate-700 mb-1">Duration (sec)</label>
+              <input id="checkpointDuration" type="number" min="10" max="600" value="60"
+                     class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500 focus:border-transparent" />
+            </div>
+            <div>
+              <label for="checkpointClass" class="block text-sm font-medium text-slate-700 mb-1">Class</label>
+              <select id="checkpointClass"
+                      class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-dora-500 focus:border-transparent">
+                <option>Class 3A</option>
+                <option>Class 3B</option>
+                <option>Class 4A</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="launchBtn"
+                  class="w-full bg-dora-600 hover:bg-dora-700 text-white font-semibold py-2.5 rounded-lg shadow transition disabled:opacity-50 disabled:cursor-not-allowed">
+            🚀 Launch Checkpoint
+          </button>
+        </div>
+
+        <!-- Right: live status -->
+        <div class="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col">
+          <h3 class="text-sm font-semibold text-slate-600 mb-3">Session Status</h3>
+          <div id="sessionStatus" class="flex-1 flex flex-col items-center justify-center text-center py-6">
+            <div class="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-3xl mb-3">⏸️</div>
+            <p id="sessionStatusText" class="font-semibold text-slate-700">No active checkpoint</p>
+            <p id="sessionStatusSub" class="text-sm text-slate-500 mt-1">Launch one to begin</p>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button id="endBtn" disabled
+                    class="flex-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition">
+              End Session
+            </button>
+            <button id="resetDemoBtn"
+                    class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 rounded-lg transition">
+              Reset Demo
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         3) LIVE CLASS PROGRESS BAR
+    ============================================================ -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-slate-900">Live Class Progress</h2>
+        <div class="flex items-center gap-2 text-sm">
+          <span id="progressCount" class="font-semibold text-dora-600">0 / 0</span>
+          <span class="text-slate-400">responded</span>
+        </div>
+      </div>
+
+      <!-- Overall progress bar -->
+      <div class="mb-5">
+        <div class="flex justify-between text-xs text-slate-500 mb-1">
+          <span>Overall completion</span>
+          <span id="overallPct">0%</span>
+        </div>
+        <div class="w-full h-4 bg-slate-100 rounded-full overflow-hidden">
+          <div id="overallBar" class="h-full bg-gradient-to-r from-dora-500 to-emerald-500 rounded-full transition-all duration-500" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Per-student progress -->
+      <div id="studentList" class="space-y-3">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- ============================================================
+         STUDENT PERSONAL MODE — built from real student learnings
+         (self-directed, active recall, theory-gap repair, spaced
+         repetition across the Mon/Tue school gap)
+    ============================================================ -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <div class="flex items-center justify-between mb-1">
+        <h2 class="text-xl font-bold text-slate-900">My Personal Mode</h2>
+        <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-dora-100 text-dora-700">Student · Private</span>
+      </div>
+      <p class="text-sm text-slate-500 mb-5">
+        Your own space — no teacher watching, no grades. Learn on your terms:
+        prove you understand instead of just nodding along.
+      </p>
+
+      <div class="grid lg:grid-cols-3 gap-4">
+        <!-- Left: topic picker (agency) -->
+        <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold text-slate-600 mb-3">Choose what to master</h3>
+          <div id="topicList" class="space-y-2">
+            <!-- Rendered by JS -->
+          </div>
+          <p class="text-xs text-slate-400 mt-3">You pick the pace. DORA never forces a topic on you.</p>
+        </div>
+
+        <!-- Middle: active recall card -->
+        <div class="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col">
+          <h3 class="text-sm font-semibold text-slate-600 mb-3">Active recall</h3>
+          <div id="recallCard" class="flex-1 flex flex-col items-center justify-center text-center py-6">
+            <div class="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center text-2xl mb-3">🧠</div>
+            <p id="recallPrompt" class="font-semibold text-slate-700">Pick a topic to start</p>
+            <p id="recallHint" class="text-sm text-slate-500 mt-1">No topic selected yet</p>
+          </div>
+          <!-- Alternative explanation shown when the student doesn't get it -->
+          <div id="explainBox" class="hidden mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-left">
+            <p class="text-xs font-semibold text-amber-700 mb-1">Let's try it differently:</p>
+            <p id="explainText" class="text-sm text-slate-700"></p>
+          </div>
+          <div class="flex flex-col gap-2 mt-3">
+            <div class="flex gap-2">
+              <button id="revealBtn" disabled
+                      class="flex-1 bg-slate-200 hover:bg-slate-300 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-semibold py-2 rounded-lg transition">
+                Reveal answer
+              </button>
+              <button id="gotItBtn" disabled
+                      class="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition">
+                I got it ✓
+              </button>
+            </div>
+            <button id="dontGetItBtn" disabled
+                    class="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2 rounded-lg transition">
+              🤔 I don't get it
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: spaced repetition queue -->
+        <div class="bg-slate-50 rounded-xl border border-slate-200 p-4">
+          <h3 class="text-sm font-semibold text-slate-600 mb-1">Review queue</h3>
+          <p class="text-xs text-slate-400 mb-3">Spaced so you don't forget between school days.</p>
+          <div id="reviewQueue" class="space-y-2">
+            <!-- Rendered by JS -->
+          </div>
+          <div class="mt-3 pt-3 border-t border-slate-200">
+            <div class="flex justify-between text-xs text-slate-500 mb-1">
+              <span>Retention strength</span>
+              <span id="retentionPct">0%</span>
+            </div>
+            <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+              <div id="retentionBar" class="h-full bg-gradient-to-r from-amber-400 to-emerald-500 rounded-full transition-all duration-500" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================================================
+       2) STUDENT QUESTION OVERLAY (modal)
+  ============================================================ -->
+  <div id="studentOverlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+    <div class="fade-in bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <!-- Overlay header -->
+      <div class="bg-gradient-to-r from-dora-600 to-dora-700 px-6 py-4 text-white flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-wide opacity-80">Checkpoint</p>
+          <h3 id="overlayTitle" class="font-bold text-lg leading-tight">Quick Retention Check</h3>
+        </div>
+        <span class="text-xs font-semibold bg-white/20 px-2.5 py-1 rounded-full" id="overlayClass">Class 3A</span>
+      </div>
+
+      <div class="px-6 py-5">
+        <p id="overlayQuestion" class="text-slate-700 mb-4">What did we cover in today's lesson?</p>
+
+        <!-- Countdown -->
+        <div class="mb-4">
+          <div class="flex justify-between text-xs text-slate-500 mb-1">
+            <span>Time remaining</span>
+            <span id="overlayTimer">60s</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div id="overlayTimerBar" class="h-full bg-amber-400 rounded-full transition-all duration-1000" style="width:100%"></div>
+          </div>
+        </div>
+
+        <!-- Answer input -->
+        <label for="studentAnswer" class="block text-sm font-medium text-slate-700 mb-1">Your answer</label>
+        <textarea id="studentAnswer" rows="3" placeholder="Type your answer here..."
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500 focus:border-transparent"></textarea>
+
+        <div class="flex items-center justify-between mt-4">
+          <label class="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+            <input id="studentConfident" type="checkbox" class="rounded text-dora-600 focus:ring-dora-500" />
+            I feel confident
+          </label>
+          <button id="submitAnswerBtn"
+                  class="bg-dora-600 hover:bg-dora-700 text-white font-semibold px-5 py-2 rounded-lg transition">
+            Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       THEORY-GAP MICRO-LESSON MODAL
+       When you get something wrong, DORA finds the missing
+       prerequisite and serves a short lesson — just-in-time theory.
+  ============================================================ -->
+  <div id="gapOverlay" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+    <div class="fade-in bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 text-white flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-wide opacity-90">Theory gap detected</p>
+          <h3 id="gapTitle" class="font-bold text-lg leading-tight">Missing piece</h3>
+        </div>
+        <span class="text-xs font-semibold bg-white/20 px-2.5 py-1 rounded-full">2-min micro-lesson</span>
+      </div>
+      <div class="px-6 py-5">
+        <p class="text-sm text-slate-500 mb-1">You need this first:</p>
+        <p id="gapConcept" class="font-semibold text-slate-800 mb-3">Concept name</p>
+        <div id="gapLesson" class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-700 mb-4">
+          Short, plain-language explanation of the missing concept.
+        </div>
+        <div class="flex items-center justify-between">
+          <button id="gapRetryBtn"
+                  class="bg-dora-600 hover:bg-dora-700 text-white font-semibold px-5 py-2 rounded-lg transition">
+            Got it — retry
+          </button>
+          <button id="gapCloseBtn" class="text-sm text-slate-500 hover:text-slate-700 font-medium">
+            Not now
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] hidden">
+    <div class="bg-slate-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg"></div>
+  </div>
+
+  <!-- ============================================================
+       JAVASCRIPT
+  ============================================================ -->
+  <script>
+    (function () {
+      'use strict';
+
+      // ---------- Mock student roster ----------
+      const STUDENTS = [
+        { id: 1, name: 'Ava Johnson' },
+        { id: 2, name: 'Liam Smith' },
+        { id: 3, name: 'Mia Chen' },
+        { id: 4, name: 'Noah Patel' },
+        { id: 5, name: 'Emma Garcia' },
+        { id: 6, name: 'Oliver Brown' },
+        { id: 7, name: 'Sophia Lee' },
+        { id: 8, name: 'Lucas Wilson' },
+      ];
+
+      // ---------- State ----------
+      const state = {
+        active: false,
+        title: '',
+        question: '',
+        duration: 60,
+        className: '',
+        remaining: 0,
+        timerId: null,
+        responses: {},   // studentId -> { answered, answer, confident }
+        demoInterval: null,
+      };
+
+      // ---------- DOM refs ----------
+      const $ = (sel) => document.querySelector(sel);
+
+      const launchBtn = $('#launchBtn');
+      const endBtn = $('#endBtn');
+      const resetDemoBtn = $('#resetDemoBtn');
+      const sessionStatus = $('#sessionStatus');
+      const sessionStatusText = $('#sessionStatusText');
+      const sessionStatusSub = $('#sessionStatusSub');
+
+      const overlay = $('#studentOverlay');
+      const overlayTitle = $('#overlayTitle');
+      const overlayClass = $('#overlayClass');
+      const overlayQuestion = $('#overlayQuestion');
+      const overlayTimer = $('#overlayTimer');
+      const overlayTimerBar = $('#overlayTimerBar');
+      const studentAnswer = $('#studentAnswer');
+      const studentConfident = $('#studentConfident');
+      const submitAnswerBtn = $('#submitAnswerBtn');
+
+      const studentList = $('#studentList');
+      const progressCount = $('#progressCount');
+      const overallPct = $('#overallPct');
+      const overallBar = $('#overallBar');
+
+      const toast = $('#toast');
+
+      // Personal Mode DOM refs
+      const topicList = $('#topicList');
+      const recallPrompt = $('#recallPrompt');
+      const recallHint = $('#recallHint');
+      const revealBtn = $('#revealBtn');
+      const gotItBtn = $('#gotItBtn');
+      const dontGetItBtn = $('#dontGetItBtn');
+      const explainBox = $('#explainBox');
+      const explainText = $('#explainText');
+      const reviewQueue = $('#reviewQueue');
+      const retentionPct = $('#retentionPct');
+      const retentionBar = $('#retentionBar');
+
+      // Theory-gap modal refs
+      const gapOverlay = $('#gapOverlay');
+      const gapConcept = $('#gapConcept');
+      const gapLesson = $('#gapLesson');
+      const gapRetryBtn = $('#gapRetryBtn');
+      const gapCloseBtn = $('#gapCloseBtn');
+
+      // ---------- Helpers ----------
+      function showToast(msg) {
+        toast.querySelector('div').textContent = msg;
+        toast.classList.remove('hidden');
+        toast.classList.add('flex');
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => {
+          toast.classList.add('hidden');
+          toast.classList.remove('flex');
+        }, 2500);
+      }
+
+      function setSessionStatus(icon, text, sub) {
+        sessionStatus.innerHTML =
+          '<div class="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center text-3xl mb-3">' + icon + '</div>' +
+          '<p class="font-semibold text-slate-700">' + text + '</p>' +
+          '<p class="text-sm text-slate-500 mt-1">' + sub + '</p>';
+      }
+
+      // ---------- Render student list ----------
+      function renderStudentList() {
+        studentList.innerHTML = '';
+        STUDENTS.forEach((s) => {
+          const r = state.responses[s.id];
+          const answered = !!(r && r.answered);
+
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-3 p-3 rounded-xl border transition ' +
+            (answered ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white');
+
+          // Avatar
+          const initials = s.name.split(' ').map(w => w[0]).join('').toUpperCase();
+          const avatar = document.createElement('div');
+          avatar.className = 'w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ' +
+            (answered ? 'bg-emerald-500' : 'bg-slate-300');
+          avatar.textContent = initials;
+          row.appendChild(avatar);
+
+          // Name + status
+          const info = document.createElement('div');
+          info.className = 'flex-1 min-w-0';
+          const name = document.createElement('p');
+          name.className = 'font-medium text-slate-800 truncate';
+          name.textContent = s.name;
+          const status = document.createElement('p');
+          status.className = 'text-xs ' + (answered ? 'text-emerald-600' : 'text-slate-400');
+          status.textContent = answered
+            ? (r.confident ? '✓ Answered · confident' : '✓ Answered')
+            : 'Waiting…';
+          info.appendChild(name);
+          info.appendChild(status);
+          row.appendChild(info);
+
+          // Per-student mini progress bar
+          const barWrap = document.createElement('div');
+          barWrap.className = 'w-24 shrink-0';
+          const bar = document.createElement('div');
+          bar.className = 'h-2 bg-slate-200 rounded-full overflow-hidden';
+          const fill = document.createElement('div');
+          fill.className = 'h-full rounded-full transition-all duration-500 ' +
+            (answered ? 'bg-emerald-500' : 'bg-slate-300');
+          fill.style.width = answered ? '100%' : '0%';
+          bar.appendChild(fill);
+          barWrap.appendChild(bar);
+          row.appendChild(barWrap);
+
+          studentList.appendChild(row);
+        });
+        updateProgressSummary();
+      }
+
+      function updateProgressSummary() {
+        const total = STUDENTS.length;
+        const answered = STUDENTS.filter(s => state.responses[s.id] && state.responses[s.id].answered).length;
+        const pct = total ? Math.round((answered / total) * 100) : 0;
+        progressCount.textContent = answered + ' / ' + total;
+        overallPct.textContent = pct + '%';
+        overallBar.style.width = pct + '%';
+      }
+
+      // ---------- Countdown ----------
+      function startCountdown() {
+        clearInterval(state.timerId);
+        state.remaining = state.duration;
+        updateTimerUI();
+        state.timerId = setInterval(() => {
+          state.remaining--;
+          updateTimerUI();
+          if (state.remaining <= 0) {
+            clearInterval(state.timerId);
+            state.timerId = null;
+            autoEndSession();
+          }
+        }, 1000);
+      }
+
+      function updateTimerUI() {
+        const secs = Math.max(0, state.remaining);
+        overlayTimer.textContent = secs + 's';
+        const pct = state.duration ? (secs / state.duration) * 100 : 0;
+        overlayTimerBar.style.width = pct + '%';
+        overlayTimerBar.className = 'h-full rounded-full transition-all duration-1000 ' +
+          (pct > 50 ? 'bg-emerald-400' : pct > 20 ? 'bg-amber-400' : 'bg-rose-500');
+      }
+
+      // ---------- Launch checkpoint ----------
+      function launchCheckpoint() {
+        if (state.active) {
+          showToast('A checkpoint is already active. End it first.');
+          return;
+        }
+
+        const title = $('#checkpointTitle').value.trim() || 'Quick Retention Check';
+        const question = $('#checkpointQuestion').value.trim() || 'What did we cover in today\'s lesson?';
+        const duration = Math.max(10, Math.min(600, parseInt($('#checkpointDuration').value, 10) || 60));
+        const className = $('#checkpointClass').value;
+
+        state.active = true;
+        state.title = title;
+        state.question = question;
+        state.duration = duration;
+        state.className = className;
+        state.responses = {};
+
+        // UI state
+        launchBtn.disabled = true;
+        endBtn.disabled = false;
+        setSessionStatus('✅', 'Checkpoint active', 'Waiting for student responses…');
+        $('#liveBadge').innerHTML =
+          '<span class="pulse-dot w-2 h-2 rounded-full bg-emerald-500"></span> Live · ' + title;
+
+        // Open overlay & populate
+        overlayTitle.textContent = title;
+        overlayClass.textContent = className;
+        overlayQuestion.textContent = question;
+        studentAnswer.value = '';
+        studentConfident.checked = false;
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        document.body.classList.add('modal-open');
+        studentAnswer.focus();
+
+        renderStudentList();
+        startCountdown();
+        startDemoSimulation();
+        showToast('Checkpoint launched! 🚀');
+      }
+
+      // ---------- Submit answer (student) ----------
+      function submitAnswer() {
+        if (!state.active) return;
+        const answer = studentAnswer.value.trim();
+        if (!answer) {
+          showToast('Please type an answer before submitting.');
+          return;
+        }
+        // Simulate: the "student" submitting is the first unanswered student
+        const unanswered = STUDENTS.find(s => !(state.responses[s.id] && state.responses[s.id].answered));
+        const targetId = unanswered ? unanswered.id : STUDENTS[0].id;
+
+        state.responses[targetId] = {
+          answered: true,
+          answer: answer,
+          confident: studentConfident.checked,
+        };
+
+        renderStudentList();
+        showToast('Answer submitted by ' + (unanswered ? unanswered.name : 'student') + ' ✓');
+
+        // Close overlay if all answered
+        const allAnswered = STUDENTS.every(s => state.responses[s.id] && state.responses[s.id].answered);
+        if (allAnswered) {
+          closeOverlay();
+          endSession('All students responded! 🎉');
+        } else {
+          // Re-open for next student (clear input)
+          studentAnswer.value = '';
+          studentConfident.checked = false;
+          studentAnswer.focus();
+        }
+      }
+
+      // ---------- Demo simulation (auto-responds students over time) ----------
+      function startDemoSimulation() {
+        clearInterval(state.demoInterval);
+        state.demoInterval = setInterval(() => {
+          if (!state.active) { clearInterval(state.demoInterval); return; }
+          const unanswered = STUDENTS.filter(s => !(state.responses[s.id] && state.responses[s.id].answered));
+          if (unanswered.length === 0) { clearInterval(state.demoInterval); return; }
+          // Randomly respond a student
+          const s = unanswered[Math.floor(Math.random() * unanswered.length)];
+          state.responses[s.id] = {
+            answered: true,
+            answer: 'Sample answer from ' + s.name,
+            confident: Math.random() > 0.4,
+          };
+          renderStudentList();
+        }, 2500);
+      }
+
+      // ---------- End / auto-end ----------
+      function autoEndSession() {
+        if (!state.active) return;
+        closeOverlay();
+        endSession('⏰ Time is up! Checkpoint ended.');
+      }
+
+      function endSession(msg) {
+        if (!state.active) return;
+        state.active = false;
+        clearInterval(state.timerId);
+        clearInterval(state.demoInterval);
+        state.timerId = null;
+        state.demoInterval = null;
+
+        launchBtn.disabled = false;
+        endBtn.disabled = true;
+        setSessionStatus('📊', 'Session complete', 'Review the progress above');
+        $('#liveBadge').innerHTML =
+          '<span class="pulse-dot w-2 h-2 rounded-full bg-emerald-500"></span> Live';
+        if (msg) showToast(msg);
+      }
+
+      function closeOverlay() {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        document.body.classList.remove('modal-open');
+      }
+
+      function resetDemo() {
+        clearInterval(state.timerId);
+        clearInterval(state.demoInterval);
+        state.timerId = null;
+        state.demoInterval = null;
+        state.active = false;
+        state.responses = {};
+        launchBtn.disabled = false;
+        endBtn.disabled = true;
+        closeOverlay();
+        setSessionStatus('⏸️', 'No active checkpoint', 'Launch one to begin');
+        $('#liveBadge').innerHTML =
+          '<span class="pulse-dot w-2 h-2 rounded-full bg-emerald-500"></span> Live';
+        renderStudentList();
+        showToast('Demo reset.');
+      }
+
+      // ============================================================
+      //  PERSONAL MODE — built from real student learnings
+      //  Self-directed, active recall, theory-gap repair, spaced
+      //  repetition across the Mon/Tue school gap.
+      // ============================================================
+
+      // ---------- Learning content model ----------
+      // Each topic has cards. Each card has a prompt (question) and
+      // an answer. If a card is answered wrong, DORA detects the
+      // missing prerequisite (theory gap) and serves a micro-lesson.
+      const TOPICS = [
+        {
+          id: 'law',
+          name: '📘 Law (OR / ZGB)',
+          desc: 'Swiss civil & contract law',
+          cards: [
+            { q: 'What does OR stand for?', a: 'Obligationenrecht — the Swiss law of obligations (contracts).', gap: 'Legal abbreviations', gapLesson: 'In Swiss law, OR = Obligationenrecht (law of obligations/contracts) and ZGB = Zivilgesetzbuch (civil code). Knowing the codes is the first step to finding any legal rule.', explain: 'Think of Swiss law as a library. OR and ZGB are two big books: OR covers agreements between people/companies (contracts), ZGB covers everything else in private life (family, property). "OR" is just the shelf label for the contracts book.' },
+            { q: 'What is a contract (Vertrag)?', a: 'An agreement between parties that creates legal obligations.', gap: 'Contract basics', gapLesson: 'A contract is a legally binding agreement. For most contracts you need: offer, acceptance, and capacity of the parties. No contract, no obligation.', explain: 'A contract is a promise the law will enforce. If you agree to sell your bike for 100 CHF and the other person agrees to pay, that is a contract. The law steps in if someone breaks their promise.' },
+            { q: 'What does "freedom of contract" mean?', a: 'Parties are free to decide whether and how to contract.', gap: 'Party autonomy', gapLesson: 'Freedom of contract (Vertragsfreiheit) means you choose if, with whom, and on what terms you contract — within legal limits.', explain: 'It means you are the boss of your own deals: you choose whether to agree, who you agree with, and what the terms are. The law only steps in to stop unfair or illegal deals.' },
+          ]
+        },
+        {
+          id: 'math',
+          name: '🧮 Math',
+          desc: 'Foundations that unlock exercises',
+          cards: [
+            { q: 'What is a variable?', a: 'A symbol (like x) that stands for an unknown value.', gap: 'Variables', gapLesson: 'A variable is a placeholder for a number you do not know yet. Solving an equation means finding the value that makes it true.', explain: 'A variable is a blank box with a label. "x + 3 = 7" means "some number, which we call x, plus 3 equals 7." Your job is to find what number goes in the box.' },
+            { q: 'What does "solve for x" mean?', a: 'Isolate x on one side to find its value.', gap: 'Equation solving', gapLesson: 'To solve for x, do the same operation to both sides until x is alone. Whatever you do to one side, do to the other.', explain: 'An equation is a balanced scale. To solve for x you keep it balanced: whatever you remove or add on one side, you do the same on the other, until x sits alone on one side.' },
+            { q: 'What is a percentage?', a: 'A fraction out of 100.', gap: 'Percentages', gapLesson: 'Percent means "out of 100". 25% = 25/100 = 0.25. To find 25% of 80, multiply 80 × 0.25 = 20.', explain: '"Percent" literally means "per hundred." 25% means 25 out of every 100. To find 25% of 80, ask: what is 25 out of 100 of 80? That is 80 × 0.25 = 20.' },
+          ]
+        },
+        {
+          id: 'finance',
+          name: '💶 Finance & Bookkeeping',
+          desc: 'Money flows & double entry',
+          cards: [
+            { q: 'What is double-entry bookkeeping?', a: 'Every transaction affects at least two accounts (debit & credit).', gap: 'Double entry', gapLesson: 'Double entry means every transaction is recorded twice: once as a debit and once as a credit. The books always balance. This is the core of accounting.', explain: 'Every deal has two sides: money comes from somewhere and goes somewhere. If you buy a laptop for cash, cash goes down (credit) and equipment goes up (debit). Two entries, always balanced.' },
+            { q: 'What is an asset (Aktiv)?', a: 'Something the business owns that has value.', gap: 'Assets vs liabilities', gapLesson: 'Assets (Aktiven) are what you own. Liabilities (Passiven/Fremdkapital) are what you owe. Equity (Eigenkapital) = Assets − Liabilities.', explain: 'Assets are what you own (cash, laptop, building). Liabilities are what you owe (a loan). What is truly yours = what you own minus what you owe.' },
+            { q: 'What does "balance sheet" show?', a: 'What a business owns and owes at a point in time.', gap: 'Balance sheet', gapLesson: 'The balance sheet is a snapshot: Assets on one side, Liabilities + Equity on the other. Both sides must always be equal.', explain: 'A balance sheet is a photo of the business on one day. Left side: everything it owns. Right side: who paid for it (borrowed money + owners money). The two sides always match.' },
+          ]
+        }
+      ];
+
+      // Spaced-repetition state per card: { intervalDays, dueDaysAgo, strength }
+      // Simulates the Mon/Tue school gap so reviews are "due" between days.
+      const personal = {
+        selectedTopic: null,
+        currentCard: null,
+        revealed: false,
+        // cardKey -> { intervalDays, dueInDays, strength }
+        srs: {},
+      };
+
+      // ---------- Personal Mode renderers ----------
+      function renderTopicList() {
+        topicList.innerHTML = '';
+        TOPICS.forEach((t) => {
+          const btn = document.createElement('button');
+          btn.className = 'w-full text-left px-3 py-2.5 rounded-lg border transition text-sm font-medium ' +
+            (personal.selectedTopic === t.id
+              ? 'border-dora-500 bg-dora-50 text-dora-700'
+              : 'border-slate-200 bg-white text-slate-700 hover:border-dora-300');
+          btn.innerHTML = '<span class="font-semibold">' + t.name + '</span>' +
+            '<span class="block text-xs text-slate-400 font-normal">' + t.desc + '</span>';
+          btn.addEventListener('click', () => selectTopic(t.id));
+          topicList.appendChild(btn);
+        });
+      }
+
+      function selectTopic(topicId) {
+        personal.selectedTopic = topicId;
+        personal.currentCard = null;
+        personal.revealed = false;
+        renderTopicList();
+        nextCard();
+      }
+
+      function hideExplain() {
+        explainBox.classList.add('hidden');
+        explainText.textContent = '';
+      }
+
+      function nextCard() {
+        if (!personal.selectedTopic) {
+          setRecallIdle('Pick a topic to start', 'No topic selected yet');
+          return;
+        }
+        const topic = TOPICS.find(t => t.id === personal.selectedTopic);
+        // Prefer cards that are "due" for review (spaced repetition),
+        // otherwise pick the next unseen card.
+        const unseen = topic.cards.find(c => !personal.srs[topic.id + ':' + c.q]);
+        const due = topic.cards.find(c => {
+          const s = personal.srs[topic.id + ':' + c.q];
+          return s && s.dueInDays <= 0;
+        });
+        const card = due || unseen || topic.cards[Math.floor(Math.random() * topic.cards.length)];
+        personal.currentCard = card;
+        personal.revealed = false;
+        hideExplain();
+        revealBtn.disabled = false;
+        gotItBtn.disabled = true;
+        dontGetItBtn.disabled = true;
+        recallPrompt.textContent = card.q;
+        recallHint.textContent = 'Try to answer from memory first — then reveal.';
+      }
+
+      function setRecallIdle(prompt, hint) {
+        recallPrompt.textContent = prompt;
+        recallHint.textContent = hint;
+        hideExplain();
+        revealBtn.disabled = true;
+        gotItBtn.disabled = true;
+        dontGetItBtn.disabled = true;
+      }
+
+      function revealAnswer() {
+        if (!personal.currentCard) return;
+        personal.revealed = true;
+        recallPrompt.textContent = personal.currentCard.a;
+        recallHint.textContent = 'Did you get it right? Be honest — this is private.';
+        revealBtn.disabled = true;
+        gotItBtn.disabled = false;
+        dontGetItBtn.disabled = false;
+      }
+
+      // Honest "I don't get it" path: no faking. Show a plain-language
+      // explanation, then let the student skip (it comes back later via
+      // spaced repetition) or retry once they feel ready.
+      function showExplain() {
+        if (!personal.currentCard) return;
+        explainText.textContent = personal.currentCard.explain || 'No extra explanation yet.';
+        explainBox.classList.remove('hidden');
+        dontGetItBtn.disabled = true;
+        gotItBtn.disabled = true;
+        recallHint.textContent = 'Read this slowly. When it clicks, mark it — or skip and it will return later.';
+      }
+
+      function skipCard() {
+        if (!personal.currentCard) return;
+        const topic = TOPICS.find(t => t.id === personal.selectedTopic);
+        const card = personal.currentCard;
+        const key = topic.id + ':' + card.q;
+        // Don't fake a "got it". Schedule a short return so it comes back soon.
+        personal.srs[key] = {
+          intervalDays: 1,
+          dueInDays: 0, // due again right away in the review queue
+          strength: Math.min(100, (personal.srs[key]?.strength || 0) + 5),
+        };
+        showToast('Skipped — it will come back so you can really get it. 🔁');
+        renderReviewQueue();
+        nextCard();
+      }
+
+      // ---------- Theory-gap detection ----------
+      // If the student did NOT get it, DORA detects the missing
+      // prerequisite and serves a micro-lesson before retrying.
+      function markResult(gotIt) {
+        if (!personal.currentCard) return;
+        const topic = TOPICS.find(t => t.id === personal.selectedTopic);
+        const card = personal.currentCard;
+        const key = topic.id + ':' + card.q;
+
+        if (gotIt) {
+          // Strengthen: increase interval (spaced repetition)
+          const prev = personal.srs[key] || { intervalDays: 1, dueInDays: 0, strength: 0 };
+          const newInterval = prev.intervalDays === 1 ? 3 : prev.intervalDays === 3 ? 7 : 14;
+          personal.srs[key] = {
+            intervalDays: newInterval,
+            dueInDays: newInterval, // due again after the interval
+            strength: Math.min(100, (prev.strength || 0) + 25),
+          };
+          showToast('Strengthened ✓ — next review in ' + newInterval + ' day(s).');
+        } else {
+          // Theory gap: open the micro-lesson modal with the missing piece
+          openGapModal(card);
+          return; // don't advance yet — wait for "Got it — retry"
+        }
+
+        renderReviewQueue();
+        nextCard();
+      }
+
+      function openGapModal(card) {
+        gapConcept.textContent = card.gap;
+        gapLesson.textContent = card.gapLesson;
+        gapOverlay.classList.remove('hidden');
+        gapOverlay.classList.add('flex');
+        document.body.classList.add('modal-open');
+      }
+
+      function closeGapModal() {
+        gapOverlay.classList.add('hidden');
+        gapOverlay.classList.remove('flex');
+        document.body.classList.remove('modal-open');
+      }
+
+      function retryAfterGap() {
+        closeGapModal();
+        // After the micro-lesson, re-ask the same card so the student
+        // proves they now understand (active recall, not passive reading).
+        personal.revealed = false;
+        hideExplain();
+        revealBtn.disabled = false;
+        gotItBtn.disabled = true;
+        dontGetItBtn.disabled = true;
+        recallPrompt.textContent = personal.currentCard.q;
+        recallHint.textContent = 'Now try again with the theory fresh in mind.';
+        showToast('Micro-lesson done — now prove it. 🧠');
+      }
+
+      // ---------- Spaced repetition review queue ----------
+      function renderReviewQueue() {
+        reviewQueue.innerHTML = '';
+        let totalStrength = 0;
+        let count = 0;
+        let dueNow = 0;
+
+        TOPICS.forEach((t) => {
+          t.cards.forEach((c) => {
+            const key = t.id + ':' + c.q;
+            const s = personal.srs[key];
+            if (!s) return; // not yet learned
+            count++;
+            totalStrength += s.strength;
+            if (s.dueInDays <= 0) dueNow++;
+
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-2 text-sm p-2 rounded-lg border ' +
+              (s.dueInDays <= 0 ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white');
+            const label = document.createElement('span');
+            label.className = 'flex-1 truncate text-slate-700';
+            label.textContent = c.q;
+            const badge = document.createElement('span');
+            badge.className = 'text-xs font-semibold px-2 py-0.5 rounded-full ' +
+              (s.dueInDays <= 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700');
+            badge.textContent = s.dueInDays <= 0 ? 'due now' : 'in ' + s.dueInDays + 'd';
+            row.appendChild(label);
+            row.appendChild(badge);
+            reviewQueue.appendChild(row);
+          });
+        });
+
+        if (count === 0) {
+          reviewQueue.innerHTML =
+            '<p class="text-sm text-slate-400 text-center py-4">Nothing reviewed yet.<br>Start a topic and answer honestly.</p>';
+          retentionPct.textContent = '0%';
+          retentionBar.style.width = '0%';
+          return;
+        }
+
+        const avg = Math.round(totalStrength / count);
+        retentionPct.textContent = avg + '%';
+        retentionBar.style.width = avg + '%';
+      }
+
+      // ---------- Personal Mode event wiring ----------
+      revealBtn.addEventListener('click', revealAnswer);
+      gotItBtn.addEventListener('click', () => markResult(true));
+      dontGetItBtn.addEventListener('click', showExplain);
+      gapRetryBtn.addEventListener('click', retryAfterGap);
+      gapCloseBtn.addEventListener('click', closeGapModal);
+      gapOverlay.addEventListener('click', (e) => {
+        if (e.target === gapOverlay) closeGapModal();
+      });
+
+      // ---------- Event wiring ----------
+      launchBtn.addEventListener('click', launchCheckpoint);
+      endBtn.addEventListener('click', () => endSession('Checkpoint ended by teacher.'));
+      resetDemoBtn.addEventListener('click', resetDemo);
+      submitAnswerBtn.addEventListener('click', submitAnswer);
+
+      // Allow Enter (without shift) to submit in textarea
+      studentAnswer.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          submitAnswer();
+        }
+      });
+
+      // Clicking backdrop closes overlay (only if not active session is fine to keep open)
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          // Keep session running but hide overlay
+          closeOverlay();
+        }
+      });
+
+      // ---------- Init ----------
+      renderStudentList();
+      renderTopicList();
+      renderReviewQueue();
+      setRecallIdle('Pick a topic to start', 'No topic selected yet');
+    })();
+  </script>
+</body>
+</html>
