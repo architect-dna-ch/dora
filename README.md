@@ -8,6 +8,14 @@ This repository contains the **working interactive prototype** (single-file HTML
 the **pitch to the Canton of Bern & schools**, and the **engineering
 specification / Definition of Done**.
 
+## 🔗 Live prototype (always up to date)
+
+**https://architect-dna-ch.github.io/dora/**
+
+The live version is served via GitHub Pages from the `main` branch. Every push
+to `main` updates the live site automatically — so this is a **dynamic, ongoing
+development** prototype, not a static snapshot.
+
 ---
 
 ## What DORA does — in 30 seconds
