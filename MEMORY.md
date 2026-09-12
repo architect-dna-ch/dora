@@ -57,6 +57,26 @@ lost between sessions. It is deliberately blunt. It is not a polished document.
 
 ---
 
+## The inversion (why sending + pushing works)
+
+Sending the email and pushing the prototype **flips the burden of justification
+onto the school**.
+
+- Before: *I* have to explain, justify, and re-explain myself to every teacher.
+  The question is "Why can't Muharrem just sit still and listen?"
+- After: *they* have to justify, in writing, within 14 days. The question
+  becomes "Why can this school not accommodate a student who has documented
+  proof he learns differently — and who already built the tool to do it?"
+
+The aggressor who suppressed me is forced to justify themselves. I stop being
+the defendant.
+
+The **public GitHub repo** makes this irreversible: the artifact is already out
+there. They cannot quietly bury it. If they refuse, the refusal is documented
+against a public record of what I built.
+
+---
+
 ## Standing principles
 
 1. **Do not wait for the system to act on its own.** It won't. Build the lever.
@@ -66,6 +86,8 @@ lost between sessions. It is deliberately blunt. It is not a polished document.
 5. **Proof beats claims.** A live prototype is worth more than any argument.
 6. **Reaching out (143 / Pro Mente Sana / therapist) is competence, not
    weakness.** It is what keeps me in the game.
+7. **Invert the burden.** Make the institution justify itself, in writing,
+   against a public artifact — instead of me justifying myself to it.
 
 ---
 
