@@ -180,11 +180,69 @@
     </section>
 
     <!-- ============================================================
+         TEACHER PANEL — CLASS CARDS (push cards to every student)
+         Teacher authors a card once; it is broadcast to all student
+         tabs and stored locally on each device.
+    ============================================================ -->
+    <section id="classCardsPanel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <div class="flex items-center justify-between mb-1">
+        <h2 class="text-xl font-bold text-slate-900">Class Cards</h2>
+        <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Teacher · For the whole class</span>
+      </div>
+      <p class="text-sm text-slate-500 mb-5">
+        Add a card once — it is pushed to <strong>every student</strong> in the class,
+        not just one device. Students see it in their Personal Mode.
+      </p>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label for="classCardTopic" class="block text-sm font-medium text-slate-600 mb-1">Topic</label>
+          <select id="classCardTopic"
+                  class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-dora-500">
+            <!-- Populated by JS -->
+          </select>
+        </div>
+        <div>
+          <label for="classCardQ" class="block text-sm font-medium text-slate-600 mb-1">Question</label>
+          <input id="classCardQ" type="text" placeholder="e.g. What is a liability?"
+                 class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500" />
+        </div>
+        <div class="md:col-span-2">
+          <label for="classCardA" class="block text-sm font-medium text-slate-600 mb-1">Answer</label>
+          <textarea id="classCardA" rows="2" placeholder="The correct answer"
+                    class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500"></textarea>
+        </div>
+        <div>
+          <label for="classCardGap" class="block text-sm font-medium text-slate-600 mb-1">Missing prerequisite (optional)</label>
+          <input id="classCardGap" type="text" placeholder="e.g. Assets vs liabilities"
+                 class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500" />
+        </div>
+        <div>
+          <label for="classCardLesson" class="block text-sm font-medium text-slate-600 mb-1">Micro-lesson (optional)</label>
+          <input id="classCardLesson" type="text" placeholder="Short plain-language explanation"
+                 class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500" />
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 mt-4">
+        <button id="classCardPush"
+                class="bg-dora-600 hover:bg-dora-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+          📣 Push card to all students
+        </button>
+        <span id="classCardStatus" class="text-xs text-slate-400"></span>
+      </div>
+      <p class="text-xs text-slate-400 mt-2">
+        Requires an open student tab (same device). Cards are stored on each device.
+      </p>
+    </section>
+
+    <!-- ============================================================
          STUDENT PERSONAL MODE — built from real student learnings
          (self-directed, active recall, theory-gap repair, spaced
          repetition across the Mon/Tue school gap)
+         Hidden in the teacher view — it is the student's private space.
     ============================================================ -->
-    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+    <section id="personalModeSection" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
       <div class="flex items-center justify-between mb-1">
         <h2 class="text-xl font-bold text-slate-900">My Personal Mode</h2>
         <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-dora-100 text-dora-700">Student · Private</span>
@@ -478,6 +536,17 @@
       const roleBanner = $('#roleBanner');
       const roleBannerText = $('#roleBannerText');
       const roleBannerBtn = $('#roleBannerBtn');
+
+      // ---------- Class Cards (teacher) refs ----------
+      const classCardsPanel = $('#classCardsPanel');
+      const personalModeSection = $('#personalModeSection');
+      const classCardTopic = $('#classCardTopic');
+      const classCardQ = $('#classCardQ');
+      const classCardA = $('#classCardA');
+      const classCardGap = $('#classCardGap');
+      const classCardLesson = $('#classCardLesson');
+      const classCardPush = $('#classCardPush');
+      const classCardStatus = $('#classCardStatus');
 
       // Personal Mode DOM refs
       const topicList = $('#topicList');
@@ -1115,6 +1184,7 @@
         if (!IS_STUDENT_VIEW) return;
         const teacherPanel = $('#teacherPanel');
         if (teacherPanel) teacherPanel.classList.add('hidden');
+        if (classCardsPanel) classCardsPanel.classList.add('hidden');
         // Auto-open the overlay so the student tab is ready to answer.
         overlay.classList.remove('hidden');
         overlay.classList.add('flex');
@@ -1122,6 +1192,13 @@
         overlayTitle.textContent = 'Waiting for your teacher…';
         overlayQuestion.textContent = 'The checkpoint will appear here the moment it starts.';
         submitAnswerBtn.disabled = true;
+      }
+
+      // In teacher view, hide the student's private Personal Mode.
+      // The teacher gets the Class Cards panel instead (push to all).
+      function applyTeacherViewLayout() {
+        if (IS_STUDENT_VIEW) return;
+        if (personalModeSection) personalModeSection.classList.add('hidden');
       }
 
       function handleSyncMessage(ev) {
@@ -1173,6 +1250,33 @@
 
         if (msg.type === 'session:reset') {
           resetDemo();
+        }
+
+        // Teacher pushed a class card — store it locally and merge it in.
+        if (msg.type === 'card:push') {
+          const userCards = loadUserCards();
+          if (!userCards.some(c => c.q === p.q && c.topicId === p.topicId)) {
+            userCards.push(p);
+            saveUserCards(userCards);
+          }
+          let topic = TOPICS.find(t => t.id === p.topicId);
+          if (!topic) {
+            topic = { id: p.topicId, name: p.topicName || '📣 From your teacher', desc: 'Added by your teacher', cards: [] };
+            TOPICS.push(topic);
+          }
+          if (!topic.cards.some(c => c.q === p.q)) {
+            topic.cards.push({
+              q: p.q,
+              a: p.a,
+              gap: p.gap || 'Your own prerequisite',
+              gapLesson: p.gapLesson || 'You flagged this as a gap. Re-read your own notes, then retry.',
+              explain: p.a,
+              userAuthored: true,
+            });
+          }
+          populateTopicSelect();
+          renderTopicList();
+          showToast('New card from your teacher 📣');
         }
       }
 
@@ -1261,11 +1365,89 @@
         });
       }
 
+      // ---------- Class Cards: teacher pushes a card to all students ----------
+      function populateClassCardTopicSelect() {
+        if (!classCardTopic) return;
+        classCardTopic.innerHTML = '';
+        TOPICS.forEach((t) => {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.name;
+          classCardTopic.appendChild(opt);
+        });
+        const optNew = document.createElement('option');
+        optNew.value = '__new__';
+        optNew.textContent = '＋ New topic…';
+        classCardTopic.appendChild(optNew);
+      }
+
+      if (classCardPush) {
+        classCardPush.addEventListener('click', () => {
+          const q = classCardQ.value.trim();
+          const a = classCardA.value.trim();
+          if (!q || !a) {
+            showToast('Please add at least a question and an answer.');
+            return;
+          }
+
+          let topicId = classCardTopic.value;
+          let topicName = '';
+          if (topicId === '__new__') {
+            const name = window.prompt('Name the new topic for the class:', 'Class topic');
+            if (!name || !name.trim()) return;
+            topicName = name.trim();
+            topicId = 'class-' + Date.now();
+          }
+
+          const payload = {
+            topicId: topicId,
+            topicName: topicName,
+            q: q,
+            a: a,
+            gap: classCardGap.value.trim(),
+            gapLesson: classCardLesson.value.trim(),
+          };
+
+          // Store locally too, so the teacher's own view stays consistent.
+          const userCards = loadUserCards();
+          userCards.push(payload);
+          saveUserCards(userCards);
+
+          let topic = TOPICS.find(t => t.id === topicId);
+          if (!topic) {
+            topic = { id: topicId, name: topicName || '📣 From your teacher', desc: 'Added by your teacher', cards: [] };
+            TOPICS.push(topic);
+          }
+          topic.cards.push({
+            q: q,
+            a: a,
+            gap: payload.gap || 'Your own prerequisite',
+            gapLesson: payload.gapLesson || 'You flagged this as a gap. Re-read your own notes, then retry.',
+            explain: a,
+            userAuthored: true,
+          });
+
+          broadcast('card:push', payload);
+
+          classCardQ.value = '';
+          classCardA.value = '';
+          classCardGap.value = '';
+          classCardLesson.value = '';
+          populateClassCardTopicSelect();
+          if (classCardStatus) {
+            classCardStatus.textContent = 'Pushed to all students ✓ (' + new Date().toLocaleTimeString() + ')';
+          }
+          showToast('Card pushed to all students 📣');
+        });
+      }
+
       // ---------- Init ----------
       mergeUserCards();
       initRoleBanner();
       applyStudentViewLayout();
+      applyTeacherViewLayout();
       populateTopicSelect();
+      populateClassCardTopicSelect();
       renderStudentList();
       renderTopicList();
       renderReviewQueue();
