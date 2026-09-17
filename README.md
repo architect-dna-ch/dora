@@ -10,11 +10,17 @@ specification / Definition of Done**.
 
 ## 🔗 Live prototype (always up to date)
 
-**https://architect-dna-ch.github.io/dora/**
+**GitHub Pages:** https://architect-dna-ch.github.io/dora/
+
+**Netlify (mirror):** https://silver-choux-d039bd.netlify.app/
 
 The live version is served via GitHub Pages from the `main` branch. Every push
 to `main` updates the live site automatically — so this is a **dynamic, ongoing
 development** prototype, not a static snapshot.
+
+> **Rollback:** the tag `pre-sync-feature` marks the last stable single-tab
+> version before the two-tab sync + user-authored cards were added.
+> `git checkout pre-sync-feature` to go back.
 
 ---
 
@@ -73,16 +79,54 @@ python3 -m http.server 8000
    micro-lesson** before you retry. Cards you master are scheduled into the
    **spaced-repetition review queue**.
 
+### Two-tab live demo (teacher ↔ student, no backend)
+
+DORA can run as **two tabs on the same machine** — one teacher, one student —
+synced live via the browser `BroadcastChannel` API. No server, no account.
+
+| Tab | URL | Behaviour |
+|-----|-----|-----------|
+| Teacher | `index.html?role=teacher` | Full control panel; launches/ends checkpoints |
+| Student | `index.html?role=student` | Teacher panel hidden; overlay auto-opens and mirrors the session |
+
+A **role banner** appears at the top of each tab with an **"Open other view"**
+button that spawns the counterpart tab for you.
+
+**Demo flow:**
+1. Open `index.html?role=teacher` (or just `index.html` — teacher is the default).
+2. Click **Open student view** in the banner → a second tab opens as the student.
+3. In the teacher tab, click **🚀 Launch Checkpoint** → the student tab receives
+   the question instantly and its countdown starts.
+4. Submit an answer in the student tab → it appears live in the teacher's
+   **Live Class Progress**.
+5. End the session in the teacher tab → the student tab closes its overlay.
+
+> `BroadcastChannel` only syncs tabs of the **same origin on the same device**.
+> That is exactly right for a live demo on one laptop/projector. Cross-device
+> sync would need a backend (out of scope for the prototype).
+
+### Add your own cards (no code editing)
+
+In **My Personal Mode → Choose what to master**, click **＋ Add your own card**.
+Fill in a question, an answer, and (optionally) the missing prerequisite and a
+short micro-lesson. You can target an existing topic or create a **new topic**.
+
+Cards are saved to **`localStorage`** on that device only (`dora-user-cards-v1`)
+— no server, no account, no code changes. They merge into the topic list on
+every load.
+
 ---
 
 ## Project structure
 
 ```
 dora/
-├── index.html              # Working interactive prototype (single file)
-├── PITCH_DORA_Bern_DE.md   # Pitch to the Canton of Bern & schools (German)
-├── SPEC.md                 # Definition of Done (DoD) engineering spec
-└── README.md               # This file
+├── index.html                    # Working interactive prototype (single file)
+├── PITCH_DORA_Bern_DE.md         # Pitch to the Canton of Bern & schools (German)
+├── PRESENTATION_Director_DE.md   # Mid-length demo script for a school director
+├── SPEC.md                       # Definition of Done (DoD) engineering spec
+├── MEMORY.md                     # Working notes / project memory
+└── README.md                     # This file
 ```
 
 ---
