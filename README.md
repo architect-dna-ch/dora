@@ -12,7 +12,7 @@ specification / Definition of Done**.
 
 **GitHub Pages:** https://architect-dna-ch.github.io/dora/
 
-**Netlify (mirror):** https://illustrious-unicorn-2b69e5.netlify.app/
+**Netlify (mirror):** https://serene-syrniki-d3e161.netlify.app/
 
 The live version is served via GitHub Pages from the `main` branch. Every push
 to `main` updates the live site automatically — so this is a **dynamic, ongoing
