@@ -42,6 +42,20 @@
 <body class="bg-slate-100 min-h-screen text-slate-800 antialiased">
 
   <!-- ============================================================
+       ROLE BANNER — shown when opened with ?role=teacher or ?role=student
+       Enables the two-tab live demo (teacher tab + student tab).
+  ============================================================ -->
+  <div id="roleBanner" class="hidden bg-slate-900 text-white text-sm">
+    <div class="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+      <span id="roleBannerText" class="font-medium"></span>
+      <button id="roleBannerBtn"
+              class="text-xs font-semibold bg-white/15 hover:bg-white/25 px-3 py-1 rounded-full transition">
+        Open other view
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================================
        HEADER
   ============================================================ -->
   <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-30">
@@ -70,7 +84,7 @@
     <!-- ============================================================
          1) TEACHER PANEL — LAUNCH CHECKPOINT
     ============================================================ -->
-    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+    <section id="teacherPanel" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-bold text-slate-900">Launch Checkpoint</h2>
         <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Teacher Panel</span>
@@ -188,6 +202,53 @@
             <!-- Rendered by JS -->
           </div>
           <p class="text-xs text-slate-400 mt-3">You pick the pace. DORA never forces a topic on you.</p>
+
+          <!-- Add your own card — no code editing required -->
+          <button id="addCardToggle"
+                  class="mt-3 w-full text-sm font-semibold text-dora-700 bg-dora-50 hover:bg-dora-100 border border-dora-200 py-2 rounded-lg transition">
+            ＋ Add your own card
+          </button>
+
+          <form id="addCardForm" class="hidden mt-3 space-y-2 bg-white border border-slate-200 rounded-lg p-3">
+            <div>
+              <label for="newCardTopic" class="block text-xs font-medium text-slate-600 mb-1">Topic</label>
+              <select id="newCardTopic"
+                      class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-dora-500">
+                <!-- Populated by JS -->
+              </select>
+            </div>
+            <div>
+              <label for="newCardQ" class="block text-xs font-medium text-slate-600 mb-1">Question</label>
+              <input id="newCardQ" type="text" placeholder="e.g. What is a liability?"
+                     class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500" />
+            </div>
+            <div>
+              <label for="newCardA" class="block text-xs font-medium text-slate-600 mb-1">Answer</label>
+              <textarea id="newCardA" rows="2" placeholder="The correct answer"
+                        class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500"></textarea>
+            </div>
+            <div>
+              <label for="newCardGap" class="block text-xs font-medium text-slate-600 mb-1">Missing prerequisite (optional)</label>
+              <input id="newCardGap" type="text" placeholder="e.g. Assets vs liabilities"
+                     class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500" />
+            </div>
+            <div>
+              <label for="newCardLesson" class="block text-xs font-medium text-slate-600 mb-1">Micro-lesson (optional)</label>
+              <textarea id="newCardLesson" rows="2" placeholder="Short plain-language explanation of the prerequisite"
+                        class="w-full px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dora-500"></textarea>
+            </div>
+            <div class="flex gap-2 pt-1">
+              <button type="submit"
+                      class="flex-1 bg-dora-600 hover:bg-dora-700 text-white text-sm font-semibold py-2 rounded-lg transition">
+                Save card
+              </button>
+              <button type="button" id="addCardCancel"
+                      class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold py-2 rounded-lg transition">
+                Cancel
+              </button>
+            </div>
+            <p class="text-xs text-slate-400">Saved on this device only (localStorage). No server, no account.</p>
+          </form>
         </div>
 
         <!-- Middle: active recall card -->
@@ -359,6 +420,23 @@
         demoInterval: null,
       };
 
+      // ---------- Two-tab sync bus (teacher tab <-> student tab) ----------
+      // No backend: BroadcastChannel only works between tabs of the same origin
+      // on the same machine. Perfect for a live demo on one laptop/projector.
+      const SYNC_CHANNEL = 'dora-session-sync';
+      const syncBus = (typeof BroadcastChannel !== 'undefined')
+        ? new BroadcastChannel(SYNC_CHANNEL)
+        : null;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const ROLE = (urlParams.get('role') || 'teacher').toLowerCase();
+      const IS_STUDENT_VIEW = ROLE === 'student';
+
+      function broadcast(type, payload) {
+        if (!syncBus) return;
+        try { syncBus.postMessage({ type, payload, ts: Date.now() }); } catch (e) {}
+      }
+
       // ---------- DOM refs ----------
       const $ = (sel) => document.querySelector(sel);
 
@@ -385,6 +463,21 @@
       const overallBar = $('#overallBar');
 
       const toast = $('#toast');
+
+      // ---------- User-authored card form refs ----------
+      const addCardToggle = $('#addCardToggle');
+      const addCardForm = $('#addCardForm');
+      const newCardTopic = $('#newCardTopic');
+      const newCardQ = $('#newCardQ');
+      const newCardA = $('#newCardA');
+      const newCardGap = $('#newCardGap');
+      const newCardLesson = $('#newCardLesson');
+      const addCardCancel = $('#addCardCancel');
+
+      // ---------- Role banner refs ----------
+      const roleBanner = $('#roleBanner');
+      const roleBannerText = $('#roleBannerText');
+      const roleBannerBtn = $('#roleBannerBtn');
 
       // Personal Mode DOM refs
       const topicList = $('#topicList');
@@ -551,6 +644,12 @@
         renderStudentList();
         startCountdown();
         startDemoSimulation();
+        broadcast('session:start', {
+          title: title,
+          question: question,
+          duration: duration,
+          className: className,
+        });
         showToast('Checkpoint launched! 🚀');
       }
 
@@ -573,6 +672,11 @@
         };
 
         renderStudentList();
+        broadcast('session:response', {
+          studentId: targetId,
+          answer: answer,
+          confident: studentConfident.checked,
+        });
         showToast('Answer submitted by ' + (unanswered ? unanswered.name : 'student') + ' ✓');
 
         // Close overlay if all answered
@@ -626,6 +730,7 @@
         setSessionStatus('📊', 'Session complete', 'Review the progress above');
         $('#liveBadge').innerHTML =
           '<span class="pulse-dot w-2 h-2 rounded-full bg-emerald-500"></span> Live';
+        broadcast('session:end', {});
         if (msg) showToast(msg);
       }
 
@@ -649,6 +754,7 @@
         $('#liveBadge').innerHTML =
           '<span class="pulse-dot w-2 h-2 rounded-full bg-emerald-500"></span> Live';
         renderStudentList();
+        broadcast('session:reset', {});
         showToast('Demo reset.');
       }
 
@@ -694,6 +800,55 @@
           ]
         }
       ];
+
+      // ---------- User-authored cards (localStorage, no backend) ----------
+      // Students can add their own topics/cards without touching code.
+      // Stored per-device under a single key and merged into TOPICS at load.
+      const USER_CARDS_KEY = 'dora-user-cards-v1';
+
+      function loadUserCards() {
+        try {
+          const raw = localStorage.getItem(USER_CARDS_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function saveUserCards(cards) {
+        try { localStorage.setItem(USER_CARDS_KEY, JSON.stringify(cards)); } catch (e) {}
+      }
+
+      // Merge stored user cards into TOPICS. A user card may target an
+      // existing topic id, or define a brand-new topic (id prefixed "user-").
+      function mergeUserCards() {
+        const userCards = loadUserCards();
+        userCards.forEach((uc) => {
+          let topic = TOPICS.find(t => t.id === uc.topicId);
+          if (!topic) {
+            topic = {
+              id: uc.topicId,
+              name: uc.topicName || '✏️ My own topic',
+              desc: 'Added by you',
+              cards: [],
+            };
+            TOPICS.push(topic);
+          }
+          // Avoid duplicates on repeated merges
+          if (!topic.cards.some(c => c.q === uc.q)) {
+            topic.cards.push({
+              q: uc.q,
+              a: uc.a,
+              gap: uc.gap || 'Your own prerequisite',
+              gapLesson: uc.gapLesson || 'You flagged this as a gap. Re-read your own notes, then retry.',
+              explain: uc.explain || uc.a,
+              userAuthored: true,
+            });
+          }
+        });
+      }
 
       // Spaced-repetition state per card: { intervalDays, dueDaysAgo, strength }
       // Simulates the Mon/Tue school gap so reviews are "due" between days.
@@ -939,7 +1094,178 @@
         }
       });
 
+      // ============================================================
+      //  TWO-TAB SYNC — teacher tab drives, student tab mirrors
+      // ============================================================
+      function initRoleBanner() {
+        if (!roleBanner) return;
+        const otherRole = IS_STUDENT_VIEW ? 'teacher' : 'student';
+        const otherUrl = window.location.pathname + '?role=' + otherRole;
+        roleBannerText.textContent = IS_STUDENT_VIEW
+          ? '👩‍🎓 Student view — this tab mirrors the teacher session live.'
+          : '👨‍🏫 Teacher view — open the student view in a second tab to demo.';
+        roleBannerBtn.textContent = IS_STUDENT_VIEW ? 'Open teacher view' : 'Open student view';
+        roleBannerBtn.addEventListener('click', () => window.open(otherUrl, '_blank'));
+        roleBanner.classList.remove('hidden');
+      }
+
+      // In student view, hide the teacher-only control panel so the
+      // second tab looks like a real student device.
+      function applyStudentViewLayout() {
+        if (!IS_STUDENT_VIEW) return;
+        const teacherPanel = $('#teacherPanel');
+        if (teacherPanel) teacherPanel.classList.add('hidden');
+        // Auto-open the overlay so the student tab is ready to answer.
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        document.body.classList.add('modal-open');
+        overlayTitle.textContent = 'Waiting for your teacher…';
+        overlayQuestion.textContent = 'The checkpoint will appear here the moment it starts.';
+        submitAnswerBtn.disabled = true;
+      }
+
+      function handleSyncMessage(ev) {
+        const msg = ev.data || {};
+        const p = msg.payload || {};
+
+        if (msg.type === 'session:start') {
+          // Mirror the teacher's checkpoint in this tab.
+          state.active = true;
+          state.title = p.title || 'Quick Retention Check';
+          state.question = p.question || '';
+          state.duration = p.duration || 60;
+          state.className = p.className || '';
+          state.responses = {};
+
+          overlayTitle.textContent = state.title;
+          overlayClass.textContent = state.className;
+          overlayQuestion.textContent = state.question;
+          studentAnswer.value = '';
+          studentConfident.checked = false;
+          overlay.classList.remove('hidden');
+          overlay.classList.add('flex');
+          document.body.classList.add('modal-open');
+          submitAnswerBtn.disabled = false;
+          studentAnswer.focus();
+
+          renderStudentList();
+          startCountdown();
+          showToast('Checkpoint received from teacher 📡');
+        }
+
+        if (msg.type === 'session:response') {
+          state.responses[p.studentId] = {
+            answered: true,
+            answer: p.answer,
+            confident: !!p.confident,
+          };
+          renderStudentList();
+        }
+
+        if (msg.type === 'session:end') {
+          state.active = false;
+          clearInterval(state.timerId);
+          state.timerId = null;
+          closeOverlay();
+          setSessionStatus('📊', 'Session complete', 'Review the progress above');
+          showToast('Teacher ended the checkpoint.');
+        }
+
+        if (msg.type === 'session:reset') {
+          resetDemo();
+        }
+      }
+
+      if (syncBus) syncBus.addEventListener('message', handleSyncMessage);
+
+      // ---------- User-authored card form wiring ----------
+      function populateTopicSelect() {
+        if (!newCardTopic) return;
+        newCardTopic.innerHTML = '';
+        TOPICS.forEach((t) => {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.name;
+          newCardTopic.appendChild(opt);
+        });
+        const optNew = document.createElement('option');
+        optNew.value = '__new__';
+        optNew.textContent = '＋ New topic…';
+        newCardTopic.appendChild(optNew);
+      }
+
+      if (addCardToggle) {
+        addCardToggle.addEventListener('click', () => {
+          addCardForm.classList.toggle('hidden');
+          if (!addCardForm.classList.contains('hidden')) newCardQ.focus();
+        });
+      }
+
+      if (addCardCancel) {
+        addCardCancel.addEventListener('click', () => {
+          addCardForm.classList.add('hidden');
+          addCardForm.reset();
+        });
+      }
+
+      if (addCardForm) {
+        addCardForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const q = newCardQ.value.trim();
+          const a = newCardA.value.trim();
+          if (!q || !a) {
+            showToast('Please add at least a question and an answer.');
+            return;
+          }
+
+          let topicId = newCardTopic.value;
+          let topicName = '';
+          if (topicId === '__new__') {
+            const name = window.prompt('Name your new topic:', 'My topic');
+            if (!name || !name.trim()) return;
+            topicName = name.trim();
+            topicId = 'user-' + Date.now();
+          }
+
+          const userCards = loadUserCards();
+          userCards.push({
+            topicId: topicId,
+            topicName: topicName,
+            q: q,
+            a: a,
+            gap: newCardGap.value.trim(),
+            gapLesson: newCardLesson.value.trim(),
+          });
+          saveUserCards(userCards);
+
+          // Merge just this card into the live TOPICS model.
+          let topic = TOPICS.find(t => t.id === topicId);
+          if (!topic) {
+            topic = { id: topicId, name: topicName || '✏️ My own topic', desc: 'Added by you', cards: [] };
+            TOPICS.push(topic);
+          }
+          topic.cards.push({
+            q: q,
+            a: a,
+            gap: newCardGap.value.trim() || 'Your own prerequisite',
+            gapLesson: newCardLesson.value.trim() || 'You flagged this as a gap. Re-read your own notes, then retry.',
+            explain: a,
+            userAuthored: true,
+          });
+
+          addCardForm.reset();
+          addCardForm.classList.add('hidden');
+          populateTopicSelect();
+          renderTopicList();
+          showToast('Card saved on this device ✓');
+        });
+      }
+
       // ---------- Init ----------
+      mergeUserCards();
+      initRoleBanner();
+      applyStudentViewLayout();
+      populateTopicSelect();
       renderStudentList();
       renderTopicList();
       renderReviewQueue();
